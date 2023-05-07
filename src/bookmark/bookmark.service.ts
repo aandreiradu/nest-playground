@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { CreateBookmarkDTO, EditBookmarkDTO } from './dto';
 
@@ -8,12 +8,14 @@ export class BookmarkService {
 
   async createBookmark(userId: string, dto: CreateBookmarkDTO) {
     try {
-      await this.prisma.bookmark.create({
+      const bookmark = await this.prisma.bookmark.create({
         data: {
           ...dto,
           userId: userId,
         },
       });
+
+      return bookmark;
     } catch (error) {
       throw error;
     }
@@ -47,6 +49,24 @@ export class BookmarkService {
     bookmarkId: string,
   ) {
     try {
+      //get the bookmark by id;
+      const { userId: bookmarkUserid } = await this.prisma.bookmark.findFirst({
+        where: {
+          id: bookmarkId,
+        },
+        select: {
+          userId: true,
+        },
+      });
+
+      if (!bookmarkUserid) {
+        throw new ForbiddenException('Bookmark not found');
+      }
+
+      if (userId !== bookmarkUserid) {
+        throw new ForbiddenException('Access denied');
+      }
+
       return await this.prisma.bookmark.update({
         where: {
           id: bookmarkId,
@@ -59,5 +79,31 @@ export class BookmarkService {
       throw error;
     }
   }
-  deleteBookmarkById(userId: string, bookmarkId: string) {}
+  async deleteBookmarkById(userId: string, bookmarkId: string) {
+    //get the bookmark by id;
+    const { userId: bookmarkUserid } = await this.prisma.bookmark.findFirst({
+      where: {
+        id: bookmarkId,
+      },
+      select: {
+        userId: true,
+      },
+    });
+
+    if (!bookmarkUserid) {
+      throw new ForbiddenException('Bookmark not found');
+    }
+
+    if (userId !== bookmarkUserid) {
+      throw new ForbiddenException('Access denied');
+    }
+
+    await this.prisma.bookmark.delete({
+      where: {
+        id: bookmarkId,
+      },
+    });
+
+    console.log('deleted');
+  }
 }
